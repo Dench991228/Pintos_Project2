@@ -56,6 +56,9 @@ void SysHalt(struct intr_frame* f){
 }
 
 void SysExit(struct intr_frame *f){
+  int ret_value = (*((int*)(f->esp+1)));
+  struct thread *cur = thread_current();
+  cur->ret = ret_value;
   f->eax = 0;
   thread_exit();
 }
