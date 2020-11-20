@@ -28,3 +28,5 @@
 2. 把这个值放到当前线程的ret中
 3. 正常退出,所以eax是0
 4. thread_exit()
+## Halt调用
+## Write调用

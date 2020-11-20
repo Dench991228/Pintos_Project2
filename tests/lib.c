@@ -18,10 +18,10 @@ vmsg (const char *format, va_list args, const char *suffix)
      can end up being interleaved if we're unlucky. */
   static char buf[1024];
 
-  snprintf (buf, sizeof buf, "(%s) ", test_name);
+  snprintf (buf, sizeof buf, "(%s) ", "halt");
   vsnprintf (buf + strlen (buf), sizeof buf - strlen (buf), format, args);
   strlcpy (buf + strlen (buf), suffix, sizeof buf - strlen (buf));
-  write (STDOUT_FILENO, buf, strlen (buf));
+  write (STDOUT_FILENO, buf, strlen(buf));
 }
 
 void

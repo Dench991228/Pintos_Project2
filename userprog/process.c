@@ -37,9 +37,8 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   char *real_name, *save_pointer=NULL;
-  real_name = strtok_r(file_name, " ", &save_pointer);
   strlcpy (fn_copy, file_name, PGSIZE);
-
+  real_name = strtok_r(file_name, " ", &save_pointer);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (real_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
@@ -62,8 +61,10 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   char *real_name, *save_pointer=NULL;
-  real_name = strtok_r(file_name_," ", &save_pointer);
-  success = load (real_name, &if_.eip, &if_.esp);
+  char * token;// the arguments we are analyzing
+  printf("full name:%s\n",file_name);
+  token = strtok_r(file_name," ", &save_pointer);
+  success = load (token, &if_.eip, &if_.esp);
 
   
   /* If load failed, quit. */
@@ -73,16 +74,13 @@ start_process (void *file_name_)
   char *argv[256];// the pointer to the content of the arguments
   int argc = 0;// the number of arguments 
   char * cur = if_.esp;// the current pointer
-  char * token;// the arguments we are analyzing
 
   /*copy all the content of arguments onto the heap*/
-  token = strtok_r(file_name_," ", &save_pointer);
-  cur -= (strlen(token)+1);
-  strlcpy(cur,token, strlen(token));
-  
-  while((token=strtok_r(NULL," ", &save_pointer))!=NULL){
-    cur-=(strlen(token)+1);
-    strlcpy(cur,token,strlen(token));
+  for(; token!=NULL; token = strtok_r(NULL," ", &save_pointer)){
+    printf("arg:%s\n", token);
+    cur-= (strlen(token)+2);
+    strlcpy(cur, token, strlen(token)+2);
+    argv[argc++] = cur;
   }
   /*data alignment*/
   while(((int)(cur))%4!=0){
@@ -90,6 +88,9 @@ start_process (void *file_name_)
   }
   int * arg_entry = cur;
   int i = argc-1;
+  /*push NULL onto the stack*/
+  arg_entry--;
+  (*arg_entry) = 0;
   /*put the argv[i] onto the stack*/
   while(i>=0){
     arg_entry--;
@@ -102,10 +103,12 @@ start_process (void *file_name_)
   /*把agrc放好*/
   arg_entry--;
   *arg_entry = argc;
+  //printf("argc:%d\n", *arg_entry);
   /*return address*/
   arg_entry--;
   *arg_entry=0;
   if_.esp = arg_entry;
+  //printf("return address:%d\n", *(int*)(if_.esp));
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -129,6 +132,10 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  //printf("hahaha\n");
+  while(true){
+    //printf("hahaha\n");
+  }
   return -1;
 }
 
@@ -477,8 +484,9 @@ setup_stack (void **esp)
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
+      if (success){
         *esp = PHYS_BASE;
+      }
       else
         palloc_free_page (kpage);
     }
