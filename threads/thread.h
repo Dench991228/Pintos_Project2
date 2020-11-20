@@ -5,6 +5,8 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
+#include "filesys/filesys.h"
+#include "filesys/file.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -98,10 +100,12 @@ struct thread
 
    int wait_for; //正在等待的子进程
    struct semaphore child_sema; //等待子进程的信号量
-   struct list list_children_processes; //子进程列表
 
    struct thread* father_process;//父进程
    struct list_elem child_of;//用来放在父进程的子进程列表中
+
+   struct list list_opened_file;
+   int max_fd;
 
    bool waited;//这个进程是否已经被别人给wait了
 #ifdef USERPROG
@@ -112,7 +116,11 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
-
+struct opened_file{
+   struct file *position;
+   int fd;
+   struct list_elem node;
+};
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */

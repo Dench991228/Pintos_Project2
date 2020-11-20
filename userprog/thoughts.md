@@ -50,6 +50,16 @@
 ## Create调用(完成,没什么难度)
 ## Open调用
 ### 对于thread结构体的改变
+- max_fd:当前最大的文件描述符,初始是1,之后总是比它大一,不管关不关文件都不变它
+- list_file:一个进程打开的文件
+### 新增结构体
+```C
+struct opened_file{
+    struct file* position;
+    int fd;
+    struct list_elem elem;
+};
+```
 ## Filesize调用
 ## Close调用
 ## Read调用

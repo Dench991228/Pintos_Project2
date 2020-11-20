@@ -11,6 +11,8 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "filesys/filesys.h"
+#include "filesys/file.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -475,7 +477,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   list_push_back (&all_list, &t->allelem);
-  list_init(&t->list_children_processes);//初始化子进程列表
 
   t->ret = -1;
   sema_init(&t->child_sema,0);
@@ -484,6 +485,9 @@ init_thread (struct thread *t, const char *name, int priority)
     t->father_process = thread_current();
   }
   t->waited = false;
+
+  list_init(&t->list_opened_file);
+  t->max_fd = 1;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

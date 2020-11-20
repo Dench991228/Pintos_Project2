@@ -36,6 +36,9 @@ void SysWrite(struct intr_frame*);
 /*用来应对create系统调用*/
 void SysCreate(struct intr_frame *f);
 
+/*用来应对open系统调用*/
+void SysOpen(struct intr_frame *f);
+
 void syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -43,6 +46,7 @@ void syscall_init (void)
   handlers[SYS_WRITE] = SysWrite;
   handlers[SYS_EXIT] = SysExit;
   handlers[SYS_CREATE] = SysCreate;
+  handlers[SYS_OPEN] = SysOpen;
 }
 
 static void
@@ -119,6 +123,28 @@ void SysCreate(struct intr_frame *f){
   //printf("file_name:%s\n", file_name);
   bool ok = filesys_create(file_name, initial_size);
   f->eax = (int)ok;
+}
+
+/*打开一个文件,获取它的文件描述符*/
+/*char* filename*/
+void SysOpen(struct intr_frame *f){
+  const char *file_name = (char*)getArguments(f,1);
+  validateAddr(file_name);
+  struct file* new_file_position = filesys_open(file_name);
+  if(new_file_position==NULL){
+    f->eax = -1;
+  }
+  else{
+    struct thread *cur = thread_current();
+    struct opened_file new_file;
+    struct list_elem new_node;
+    new_file.fd = cur->max_fd+1;
+    cur->max_fd++;
+    new_file.node = new_node;
+    new_file.position = new_file_position;
+    list_push_back(&cur->list_opened_file, &new_file.node);
+    f->eax = new_file.fd;
+  }
 }
 
 /*从一个进程中退出*/
