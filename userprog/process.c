@@ -62,7 +62,7 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   char *real_name, *save_pointer=NULL;
   char * token;// the arguments we are analyzing
-  printf("full name:%s\n",file_name);
+  //printf("full name:%s\n",file_name);
   token = strtok_r(file_name," ", &save_pointer);
   success = load (token, &if_.eip, &if_.esp);
 
@@ -77,7 +77,7 @@ start_process (void *file_name_)
 
   /*copy all the content of arguments onto the heap*/
   for(; token!=NULL; token = strtok_r(NULL," ", &save_pointer)){
-    printf("arg:%s\n", token);
+    //printf("arg:%s\n", token);
     cur-= (strlen(token)+2);
     strlcpy(cur, token, strlen(token)+2);
     argv[argc++] = cur;
@@ -130,13 +130,19 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
   //printf("hahaha\n");
-  while(true){
-    //printf("hahaha\n");
+  struct thread* child = get_thread_by_tid(child_tid);
+  if(child==NULL||child->father_process!=thread_current()||child->waited){//不存在这个进程,或者这个进程已经被杀死了,再或者这个进程压根就不是子进程
+    return -1;
   }
-  return -1;
+  else{
+    child->waited = true;
+    thread_current()->wait_for = child;
+    sema_down(&child->child_sema);
+    return child->ret;
+  }
 }
 
 /* Free the current process's resources. */

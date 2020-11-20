@@ -298,6 +298,10 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
+  struct thread *cur = thread_current();
+  if(cur->waited){//父进程正在等这个进程
+    sema_up(&cur->child_sema);
+  }
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
   schedule ();
@@ -469,7 +473,17 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+
   list_push_back (&all_list, &t->allelem);
+  list_init(&t->list_children_processes);//初始化子进程列表
+
+  t->ret = -1;
+  sema_init(&t->child_sema,0);
+  t->wait_for = -1;
+  if(strcmp(name,"main")!=0){
+    t->father_process = thread_current();
+  }
+  t->waited = false;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -585,3 +599,25 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+struct find_argument{
+  struct thread *saved;
+  int tid;
+};
+/*比较两个线程的tid一不一样*/
+void cmp_thread_tid(struct thread *t, void *aux){
+  struct find_argument* arg = (struct find_argument*)aux;
+  if(t->tid == arg->tid){
+    arg->saved = t;
+  }
+}
+
+/*用tid获得一个线程*/
+struct thread *get_thread_by_tid(int tid){
+  struct thread *saved;
+  struct find_argument arg = {saved, tid};
+  enum intr_level old_level = intr_disable();
+  thread_foreach(cmp_thread_tid, &arg);
+  intr_set_level(old_level);
+  return arg.saved;
+}

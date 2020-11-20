@@ -28,5 +28,22 @@
 2. 把这个值放到当前线程的ret中
 3. 正常退出,所以eax是0
 4. thread_exit()
+### 完成真正的退出
+- 修改thread结构体:
+    - 作为父进程:
+        - wait_for:当前进程在等待那个进程
+        - child_sema:因为等待某个子进程,所以需要有一个信号量
+        - children_list:子进程列表
+    - 作为子进程:
+        - father:父进程
+        - struct list_elem
+    - 本质属性:
+        - ret:返回值
+- 业务逻辑:
+    - Process_Wait检查被等待的线程是不是已经DYING
+        - 如果是,返回它的返回值
+        - 如果不是,拿信号量,等着子进程来解锁
+    - init_thread():需要考虑子进程列表,父进程,等各项属性
+    - thread_exit():看一眼父进程在没在等,在等就唤醒一下
 ## Halt调用
-## Write调用
+已完成
