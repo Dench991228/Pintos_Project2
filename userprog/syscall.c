@@ -6,6 +6,8 @@
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
 #include "pagedir.h"
+#include "filesys/filesys.h"
+#include "filesys/file.h"
 
 #define NumberCall 21
 #define stdin 1
@@ -31,12 +33,16 @@ void SysExit(struct intr_frame* );
 /* 用来应对Write系统调用*/
 void SysWrite(struct intr_frame*);
 
+/*用来应对create系统调用*/
+void SysCreate(struct intr_frame *f);
+
 void syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
   handlers[SYS_HALT] = SysHalt;
   handlers[SYS_WRITE] = SysWrite;
   handlers[SYS_EXIT] = SysExit;
+  handlers[SYS_CREATE] = SysCreate;
 }
 
 static void
@@ -44,15 +50,15 @@ syscall_handler (struct intr_frame *f)
 {
   //printf ("system call!\n");
   //shutdown_power_off();
-  int call_number = getSyscallNumber(f);
   validateAddr((const void*)f->esp);
+  int call_number = getSyscallNumber(f);
   handlers[call_number](f);
   //thread_exit();
 }
 
 /*用来判断系统调用给我的地址有没有问题*/
 bool validateAddr(void* vaddr){
-  if(vaddr!=NULL&&is_user_vaddr(vaddr)&&pagedir_get_page(thread_current()->pagedir, vaddr)){
+  if(vaddr!=NULL&&vaddr<PHYS_BASE&&is_user_vaddr(vaddr)&&pagedir_get_page(thread_current()->pagedir, vaddr)){
     return true;
   }
   else{
@@ -67,6 +73,7 @@ int getSyscallNumber(struct intr_frame *f){
 
 /*用来获取一个系统调用的参数*/
 void* getArguments(struct intr_frame *f, int pos){
+  validateAddr((int*)f->esp+pos);
   int* stack_top = f->esp;
   stack_top+=pos;
   return (void*)(*stack_top);
@@ -86,6 +93,7 @@ void SysExit(struct intr_frame *f){
   printf("%s: exit(%d)\n", thread_current()->name, ret_value);
   //struct thread *cur = thread_current();
   //cur->ret = ret_value;
+  thread_current()->ret = ret_value;
   f->eax = 0;
   thread_exit();
 }
@@ -102,8 +110,20 @@ void SysWrite(struct intr_frame *f){
   f->eax=0;
 }
 
+/*创建一个新文件*/
+/*char* file_name, unsigned initial_size*/
+void SysCreate(struct intr_frame *f){
+  const char* file_name = (char*)getArguments(f,4);
+  validateAddr(file_name);
+  unsigned initial_size = getArguments(f,2);
+  //printf("file_name:%s\n", file_name);
+  bool ok = filesys_create(file_name, initial_size);
+  f->eax = (int)ok;
+}
+
 /*从一个进程中退出*/
 void exit(int status){
-  printf("%s:exit(%d)\n", thread_current()->name, status);
+  printf("%s: exit(%d)\n", thread_current()->name, status);
+  thread_current()->ret = status;
   thread_exit();
 }

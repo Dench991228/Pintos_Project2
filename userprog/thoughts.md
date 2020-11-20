@@ -16,7 +16,7 @@
     - 通过handler中的intr_frame传递
         - 编号:esp指向的数
         - 参数:esp之上的各种数
-## Exit调用
+## Exit调用(已完成)
 ### 不考虑非法退出的情况
 1. 把eax设定为返回值
 2. thread_exit()即可
@@ -45,5 +45,14 @@
         - 如果不是,拿信号量,等着子进程来解锁
     - init_thread():需要考虑子进程列表,父进程,等各项属性
     - thread_exit():看一眼父进程在没在等,在等就唤醒一下
-## Halt调用
-已完成
+
+## Halt调用(已完成)
+## Create调用(完成,没什么难度)
+## Open调用
+### 对于thread结构体的改变
+## Filesize调用
+## Close调用
+## Read调用
+## Tell调用
+## Write调用
+## Remove调用
