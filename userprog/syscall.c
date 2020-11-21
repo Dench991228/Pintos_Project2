@@ -1,6 +1,7 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include <list.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -39,6 +40,9 @@ void SysCreate(struct intr_frame *f);
 /*用来应对open系统调用*/
 void SysOpen(struct intr_frame *f);
 
+/*用来应对close系统调用*/
+void SysClose(struct intr_frame *f);
+
 void syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -47,6 +51,7 @@ void syscall_init (void)
   handlers[SYS_EXIT] = SysExit;
   handlers[SYS_CREATE] = SysCreate;
   handlers[SYS_OPEN] = SysOpen;
+  handlers[SYS_CLOSE] = SysClose;
 }
 
 static void
@@ -130,23 +135,50 @@ void SysCreate(struct intr_frame *f){
 void SysOpen(struct intr_frame *f){
   const char *file_name = (char*)getArguments(f,1);
   validateAddr(file_name);
+  lock_acquire(&filesys_lock);
   struct file* new_file_position = filesys_open(file_name);
+  lock_release(&filesys_lock);
   if(new_file_position==NULL){
     f->eax = -1;
   }
   else{
     struct thread *cur = thread_current();
-    struct opened_file new_file;
-    struct list_elem new_node;
-    new_file.fd = cur->max_fd+1;
+    struct opened_file *new_file = malloc(sizeof(struct opened_file));
+    //printf("current max fd:%d\n", cur->max_fd);
+    new_file->fd = (cur->max_fd)+1;
+    new_file->position = new_file_position;
     cur->max_fd++;
-    new_file.node = new_node;
-    new_file.position = new_file_position;
-    list_push_back(&cur->list_opened_file, &new_file.node);
-    f->eax = new_file.fd;
+    list_push_back(&cur->list_opened_file, &new_file->node);
+    //printf("file descriptor:%d\n", new_file->fd);
+    f->eax = new_file->fd;
   }
 }
 
+/*据文件描述符关闭一个文件*/
+/*int fd*/
+void SysClose(struct intr_frame *f){
+  int fd = (int)getArguments(f,1);
+  if(fd<=1){
+    exit(-1);
+  }
+  else{
+    struct list_elem *file_node = get_file_by_fd(fd);
+    //printf("target fd:%d\n", fd);
+    if(file_node!=NULL){
+      //printf("not null!\n");
+      struct opened_file *to_be_closed = list_entry(file_node, struct opened_file, node);
+      list_remove(file_node);
+      lock_acquire(&filesys_lock);
+      file_close(to_be_closed->position);
+      lock_release(&filesys_lock);
+    }
+    else{
+      //printf("not found!\n");
+      exit(-1);
+    }
+  }
+  f->eax = 0;
+}
 /*从一个进程中退出*/
 void exit(int status){
   printf("%s: exit(%d)\n", thread_current()->name, status);

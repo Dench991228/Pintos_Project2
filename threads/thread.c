@@ -13,6 +13,7 @@
 #include "threads/vaddr.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -94,6 +95,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  lock_init (&filesys_lock);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -624,4 +626,25 @@ struct thread *get_thread_by_tid(int tid){
   thread_foreach(cmp_thread_tid, &arg);
   intr_set_level(old_level);
   return arg.saved;
+}
+
+/*从当前线程中,根据fd获得一个文件*/
+struct list_elem *get_file_by_fd(int fd){
+  struct list_elem *now = NULL;
+  struct thread *cur = thread_current();
+  for(now = list_begin(&(cur->list_opened_file)); now!=list_end(&(cur->list_opened_file)); now = list_next(now)){
+    struct opened_file *cur_file = list_entry(now,struct opened_file, node);
+    //printf("current fd:%d\n", cur_file->fd);
+    if(cur_file->fd==fd){
+      //printf("found!\n");
+      return now;
+    }
+  }
+  return NULL;
+}
+
+/*根据一个文件的fd删除一个节点*/
+void remove_file_by_fd(int fd){
+  struct list_elem *target = get_file_by_fd(fd);
+  if(target!=NULL)list_remove(target);
 }

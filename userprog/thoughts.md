@@ -48,7 +48,7 @@
 
 ## Halt调用(已完成)
 ## Create调用(完成,没什么难度)
-## Open调用
+## Open调用(已完成)
 ### 对于thread结构体的改变
 - max_fd:当前最大的文件描述符,初始是1,之后总是比它大一,不管关不关文件都不变它
 - list_file:一个进程打开的文件
@@ -60,8 +60,10 @@ struct opened_file{
     struct list_elem elem;
 };
 ```
-## Filesize调用
 ## Close调用
+- 涉及到从一个进程的文件列表中根据文件描述符找到相关的文件,并且将其删除
+- 如果fd是1或者0,就不管他
+## Filesize调用
 ## Read调用
 ## Tell调用
 ## Write调用
