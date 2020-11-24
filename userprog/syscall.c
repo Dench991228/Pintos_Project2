@@ -7,6 +7,7 @@
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
 #include "pagedir.h"
+#include "devices/input.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 
@@ -43,6 +44,12 @@ void SysOpen(struct intr_frame *f);
 /*用来应对close系统调用*/
 void SysClose(struct intr_frame *f);
 
+/*用来应对read系统调用*/
+void SysRead(struct intr_frame *f);
+
+/*用来应对filesize系统调用*/
+void SysFilesize(struct intr_frame *f);
+
 void syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -52,6 +59,8 @@ void syscall_init (void)
   handlers[SYS_CREATE] = SysCreate;
   handlers[SYS_OPEN] = SysOpen;
   handlers[SYS_CLOSE] = SysClose;
+  handlers[SYS_READ] = SysRead;
+  handlers[SYS_FILESIZE] = SysFilesize;
 }
 
 static void
@@ -115,8 +124,25 @@ void SysWrite(struct intr_frame *f){
   const char* buffer = (const char*)*(esp+6);
   unsigned size = (size_t)getArguments(f,3);
   //printf("file descriptor:%d, second arguments:%x, buffer size:%d, fourth arguments:%d, fifth arguments:%d, sixth argument:%d\n", fd, buffer,size,*(esp+4), *(esp+5), *(esp+6));
-  putbuf(buffer, size);
-  f->eax=0;
+  if(fd==0){//stdin
+    exit(-1);
+  }
+  else if(fd==1){
+    validateAddr(buffer);
+    putbuf(buffer, size);
+    f->eax=0;
+  }
+  else{
+    validateAddr(buffer);
+    struct list_elem *file_node = get_file_by_fd(fd);
+    if(file_node == NULL){//有问题的fd
+      exit(-1);
+    }
+    else{
+      struct opened_file *target_file = list_entry(file_node, struct opened_file, node);
+      f->eax = file_write(target_file->position, buffer, size);
+    }
+  }
 }
 
 /*创建一个新文件*/
@@ -135,9 +161,9 @@ void SysCreate(struct intr_frame *f){
 void SysOpen(struct intr_frame *f){
   const char *file_name = (char*)getArguments(f,1);
   validateAddr(file_name);
-  lock_acquire(&filesys_lock);
+  //lock_acquire(&filesys_lock);
   struct file* new_file_position = filesys_open(file_name);
-  lock_release(&filesys_lock);
+  //lock_release(&filesys_lock);
   if(new_file_position==NULL){
     f->eax = -1;
   }
@@ -149,7 +175,7 @@ void SysOpen(struct intr_frame *f){
     new_file->position = new_file_position;
     cur->max_fd++;
     list_push_back(&cur->list_opened_file, &new_file->node);
-    //printf("file descriptor:%d\n", new_file->fd);
+    //printf("(open)file descriptor:%d\n", new_file->fd);
     f->eax = new_file->fd;
   }
 }
@@ -168,9 +194,9 @@ void SysClose(struct intr_frame *f){
       //printf("not null!\n");
       struct opened_file *to_be_closed = list_entry(file_node, struct opened_file, node);
       list_remove(file_node);
-      lock_acquire(&filesys_lock);
+      //lock_acquire(&filesys_lock);
       file_close(to_be_closed->position);
-      lock_release(&filesys_lock);
+      //lock_release(&filesys_lock);
     }
     else{
       //printf("not found!\n");
@@ -179,6 +205,60 @@ void SysClose(struct intr_frame *f){
   }
   f->eax = 0;
 }
+
+/*从一个文件中读取内容*/
+/*int fd, char *buffer, unsigned size*/
+void SysRead(struct intr_frame *f){
+  //printf("SYS_READ!\n");
+  int fd = (int)getArguments(f,5);
+  //printf("file descriptor:%d\n", fd);
+
+  unsigned size = (unsigned)getArguments(f,7);
+  //printf("size of file:%d\n", size);
+
+  char *buffer = getArguments(f,6);
+  /*检查一波给我的地址有没有问题*/
+  if(size == (unsigned)0){
+    f->eax = 0;
+  }
+  else if(fd==0){//从stdin读取内容
+    f->eax = input_getc();
+  }
+  else if(fd>1){//从一个文件中读取内容
+    validateAddr(buffer);
+    //printf("Read from normal file!\n");
+    struct list_elem *file_node = get_file_by_fd(fd);
+    if(file_node==NULL){//不存在这个文件
+      exit(-1);
+    }
+    else{//存在这个文件,直接返回读了多少即可
+      struct file *file_position = list_entry(file_node, struct opened_file, node)->position;
+      f->eax = file_read(file_position, (const char*)buffer, size);
+    }
+  }
+  else{//描述符有问题
+    exit(-1);
+  }
+  
+}
+
+/*获取一个文件的大小*/
+/*int fd*/
+void SysFilesize(struct intr_frame *f){
+  int fd = getArguments(f,1);
+  
+  struct list_elem *target_file_node = get_file_by_fd(fd);
+  if(target_file_node==NULL){
+    //printf("File not found!\n");
+    exit(-1);
+  }
+  else{
+    struct file *target_file = list_entry(target_file_node, struct opened_file, node)->position;
+    f->eax = file_length(target_file);
+  }
+}
+
+void SysFilesize(struct intr_frame *f);
 /*从一个进程中退出*/
 void exit(int status){
   printf("%s: exit(%d)\n", thread_current()->name, status);

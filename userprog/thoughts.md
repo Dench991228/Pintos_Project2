@@ -60,11 +60,11 @@ struct opened_file{
     struct list_elem elem;
 };
 ```
-## Close调用
+## Close调用(已完成)
 - 涉及到从一个进程的文件列表中根据文件描述符找到相关的文件,并且将其删除
 - 如果fd是1或者0,就不管他
-## Filesize调用
 ## Read调用
-## Tell调用
 ## Write调用
+## Filesize调用
+## Tell调用
 ## Remove调用
