@@ -50,6 +50,9 @@ void SysRead(struct intr_frame *f);
 /*用来应对filesize系统调用*/
 void SysFilesize(struct intr_frame *f);
 
+/*用来应对seek系统调用*/
+void SysSeek(struct intr_frame *f);
+
 void syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -61,6 +64,7 @@ void syscall_init (void)
   handlers[SYS_CLOSE] = SysClose;
   handlers[SYS_READ] = SysRead;
   handlers[SYS_FILESIZE] = SysFilesize;
+  handlers[SYS_SEEK] = SysSeek;
 }
 
 static void
@@ -258,7 +262,21 @@ void SysFilesize(struct intr_frame *f){
   }
 }
 
-void SysFilesize(struct intr_frame *f);
+/*设置一个文件中的指针*/
+/*int fd, unsigned size*/
+void SysSeek(struct intr_frame *f){
+  int fd = *((int*)f->esp+4);
+  unsigned size = *((int*)f->esp+5);
+  struct list_elem *file_node = get_file_by_fd(fd);
+  if(file_node==NULL){
+    exit(-1);
+  }
+  else{
+    struct opened_file *target_file = list_entry(file_node, struct opened_file, node);
+    file_seek(target_file->position, size);
+    f->eax = 0;
+  }
+}
 /*从一个进程中退出*/
 void exit(int status){
   printf("%s: exit(%d)\n", thread_current()->name, status);
