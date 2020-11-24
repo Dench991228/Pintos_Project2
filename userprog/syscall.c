@@ -53,6 +53,9 @@ void SysFilesize(struct intr_frame *f);
 /*用来应对seek系统调用*/
 void SysSeek(struct intr_frame *f);
 
+/*用来应对remove 系统调用*/
+void SysRemove(struct intr_frame *f);
+
 void syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -65,6 +68,7 @@ void syscall_init (void)
   handlers[SYS_READ] = SysRead;
   handlers[SYS_FILESIZE] = SysFilesize;
   handlers[SYS_SEEK] = SysSeek;
+  handlers[SYS_REMOVE] = SysRemove;
 }
 
 static void
@@ -237,7 +241,10 @@ void SysRead(struct intr_frame *f){
     }
     else{//存在这个文件,直接返回读了多少即可
       struct file *file_position = list_entry(file_node, struct opened_file, node)->position;
-      f->eax = file_read(file_position, (const char*)buffer, size);
+      lock_acquire(&filesys_lock);
+      unsigned result = file_read(file_position, (const char*)buffer, size);
+      lock_release(&filesys_lock);
+      f->eax = (int)result;
     }
   }
   else{//描述符有问题
@@ -277,6 +284,17 @@ void SysSeek(struct intr_frame *f){
     f->eax = 0;
   }
 }
+
+/*删除一个文件*/
+/*const char* buffer*/
+void SysRemove(struct intr_frame *f){
+  char *file_name = getArguments(f,1);
+  lock_acquire(&filesys_lock);
+  bool result = (int)filesys_remove(file_name);
+  lock_release(&filesys_lock);
+  f->eax = result;
+}
+
 /*从一个进程中退出*/
 void exit(int status){
   printf("%s: exit(%d)\n", thread_current()->name, status);
